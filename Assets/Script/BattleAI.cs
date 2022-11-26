@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -54,14 +54,135 @@ namespace Footsies
                 {
                     SelectAttack(fightState);
                 }
+
+                //Flow for future?:
+                /*if (moveQueue.Count > 0)
+                    input |= moveQueue.Dequeue();
+                if (attackQueue.Count > 0)
+                    input |= attackQueue.Dequeue();
+                if (attackQueue.Count == 0 && moveQueue.Count > 0)
+                {
+                    //This method will then call select attack from within it, passing along
+                    //the movement which was selected
+                    SelectMovement(fightState);
+                }*/
             }
 
             return input;
         }
+        
+        private void computeNextMovement(FightState fightState) {
+          //we are given a specific distance and player move, and must test each AI move
+          //to see which one gives the best reward, returns the reward of which move to make
+          //each value is a reward for the given approach
+          double[] maxRewards = {0,0,0,0,0,0,0};
+          //General Strategy
+          //Fall back higher reward if player is <2.5
+          //Fall back higher reward if player is normal/special attack
+          //Fall back lower reward if player is blocking
+          //Mid approach higher if distance is 2.5-3.5
+          //Mid approach higher if player is blocking/guard break
+          //Mid approach lower if player is normal/special attack
+          //Far approach higher if distance >3.5
+          //Far apporach higher if player is blocking/guard break
+          //Far approach lower is player is normal/special attack
+          //Neutral approach higher if distance >2.5 AND player attacking
+          //Neutral approach higher if player is blocking/guard break
+
+          if(fightState.distanceX > 3.5f) {
+            maxRewards[4] += 5;
+            maxRewards[5] += 5;
+            if(fightState.isOpponentBlocking || fightState.isOpponentGuardBreak) {
+              maxRewards[4] += 2;
+              maxRewards[5] += ((double)fightState.distanceX)/4.0;
+            }
+            else if(fightState.isOpponentSpecialAttack) {
+              maxRewards[0] += 6;
+            }
+            else {
+              maxRewards[4] -= 2;
+              maxRewards[5] -= 2;
+            }
+          }
+          else if(fightState.distanceX < 3.5f && fightState.distanceX > 2.5f) {
+            maxRewards[2] += 5;
+            maxRewards[3] += 5;
+            maxRewards[6] += 5;
+            if(fightState.isOpponentBlocking || fightState.isOpponentGuardBreak) {
+              maxRewards[2] += 5;
+              maxRewards[3] += ((double) fightState.distanceX)/3.0;
+              maxRewards[6] += 5;
+            }
+            else if(fightState.isOpponentSpecialAttack) {
+              maxRewards[0] += 6;
+            }
+            else {
+              maxRewards[2] -= 2;
+              maxRewards[3] -= 2;
+              maxRewards[6] -= 1;
+            }
+          }
+          else if (fightState.distanceX < 2.5f) {
+            maxRewards[0] += 2.5/ (double)fightState.distanceX;
+            maxRewards[1] += (double) fightState.distanceX;
+            if(fightState.isOpponentNormalAttack || fightState.isOpponentSpecialAttack) {
+              maxRewards[0] += 1;
+              maxRewards[1] += 1;
+              maxRewards[6] -= 1;
+            }
+            else {
+              maxRewards[0] -= 1;
+              maxRewards[1] -= 1;
+              maxRewards[6] -= 0;
+            }
+          }
+          double maxValue = -10000;
+          int aiActionToTake = 0;
+          for(int i = 0; i < maxRewards.Length; i++) {
+            if(maxRewards[i] > maxValue) {
+              maxValue = maxRewards[i];
+              aiActionToTake = i;
+            }
+          }
+
+          if(aiActionToTake == 0) {
+            AddFallBack1();
+          }
+          else if(aiActionToTake == 1) {
+            AddFallBack2();
+          }
+          else if(aiActionToTake == 2) {
+            AddMidApproach1();
+          }
+          else if(aiActionToTake == 3) {
+            AddMidApproach2();
+          }
+          else if(aiActionToTake == 4) {
+            AddFarApproach1();
+          }
+          else if(aiActionToTake == 5) {
+            AddFarApproach2();
+          }
+          else if(aiActionToTake == 6) {
+            AddNeutralMovement();
+          }
+
+
+        }
+
+        //Values for each of the AI approaches
+        //0 --> FallBack1
+        //1 --> FallBack2
+        //2 --> MidApproach1
+        //3 --> MidApproach2
+        //4 --> FarApproach1
+        //5 --> FarApproach2
+        //6 --> Neutral
 
         private void SelectMovement(FightState fightState)
         {
-            if (fightState.distanceX > 4f)
+            computeNextMovement(fightState);
+            /*if (fightState.distanceX > 4f)
             {
                 var rand = Random.Range(0, 2);
                 if (rand == 0)
@@ -116,12 +237,89 @@ namespace Footsies
                     AddFallBack2();
                 else
                     AddNeutralMovement();
+            }*/
+        }
+
+        private void computeNextAttack(FightState fightState) {
+          //we are given a specific distance and player move, and must test each AI attack
+          //to see which one gives the best reward, returns the reward of which move to make
+          //each value is a reward for the given approach
+          //We are also assuming that we know which approach we are going with
+          double[] maxRewards = {0,0,0,0,0};
+          //General Strategy
+          //If player <2.5, one hit or two hit immediate
+          //If player 2.5-3.5, immediateSpecial or none
+          //If player >3.5 delaySpecial or none
+          if (fightState.distanceX < 2.5f) {
+            maxRewards[4] += (double) fightState.distanceX / 1.25;
+            maxRewards[1] += 2.5/ (double)fightState.distanceX;
+
+            if(fightState.isOpponentNormalAttack || fightState.isOpponentSpecialAttack) {
+              maxRewards[4] -= 2;
+              maxRewards[1] -= 2;
+              maxRewards[2] -= 1;
             }
+            else {
+              maxRewards[4] += 1;
+              maxRewards[1] += 1;
+              maxRewards[2] -= 1;
+            }
+          }
+          else if(fightState.distanceX < 3.5f && fightState.distanceX > 2.5f) {
+            maxRewards[3] += 1;
+            maxRewards[2] += 1;
+            if(fightState.isOpponentBlocking || fightState.isOpponentGuardBreak) {
+              maxRewards[3] -= 2;
+              maxRewards[2] += 1;
+            }
+            else {
+              maxRewards[3] += 2;
+              maxRewards[2] -= 1;
+            }
+          }
+          else if(fightState.distanceX > 3.5f) {
+            maxRewards[0] += 1;
+            maxRewards[2] += 1;
+            if(fightState.isOpponentBlocking || fightState.isOpponentGuardBreak) {
+              maxRewards[2] += 1;
+              maxRewards[3] += ((double)fightState.distanceX)/4.0;
+            }
+            else {
+              maxRewards[0] -= 2;
+              maxRewards[3] -= 1;
+            }
+          }
+          double maxValue = -10000;
+          int aiActionToTake = 0;
+          for(int i = 0; i < maxRewards.Length; i++) {
+            if(maxRewards[i] > maxValue) {
+              maxValue = maxRewards[i];
+              aiActionToTake = i;
+            }
+          }
+
+          if(aiActionToTake == 0) {
+            AddOneHitImmediateAttack();
+          }
+          else if(aiActionToTake == 1) {
+            AddTwoHitImmediateAttack();
+          }
+          else if(aiActionToTake == 2) {
+            AddNoAttack();
+          }
+          else if(aiActionToTake == 3) {
+            AddDelaySpecialAttack();
+          }
+          else if(aiActionToTake == 4) {
+            AddImmediateSpecialAttack();
+          }
+
         }
 
         private void SelectAttack(FightState fightState)
         {
-            if (fightState.isOpponentDamage
+            computeNextAttack(fightState);
+            /*if (fightState.isOpponentDamage
                 || fightState.isOpponentGuardBreak
                 || fightState.isOpponentSpecialAttack)
             {
@@ -180,7 +378,7 @@ namespace Footsies
                     AddOneHitImmediateAttack();
                 else
                     AddTwoHitImmediateAttack();
-            }
+            }*/
         }
 
         private void AddNeutralMovement()
