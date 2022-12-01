@@ -17,6 +17,18 @@ namespace Footsies
             public bool isOpponentSpecialAttack;
         }
 
+        public class movementReward{
+            public string type;
+            public double reward;
+            public FightState playerMove;
+        }
+
+        public class attackReward{
+            public string type;
+            public double reward;
+            public FightState playerMove;
+        }
+
         private BattleCore battleCore;
 
         private Queue<int> moveQueue = new Queue<int>();
@@ -32,7 +44,7 @@ namespace Footsies
             battleCore = core;
         }
 
-        public int getNextAIInput()
+        public int getNextAIInput(movementReward movement, attackReward attack)
         {
             int input = 0;
 
@@ -45,14 +57,14 @@ namespace Footsies
                     input |= moveQueue.Dequeue();
                 else if (moveQueue.Count == 0)
                 {
-                    SelectMovement(fightState);
+                    SelectMovement(movement);
                 }
 
                 if (attackQueue.Count > 0)
                     input |= attackQueue.Dequeue();
                 else if (attackQueue.Count == 0)
                 {
-                    SelectAttack(fightState);
+                    SelectAttack(attack);
                 }
 
                 //Flow for future?:
@@ -70,315 +82,220 @@ namespace Footsies
 
             return input;
         }
-        
-        private void computeNextMovement(FightState fightState) {
-          //we are given a specific distance and player move, and must test each AI move
-          //to see which one gives the best reward, returns the reward of which move to make
-          //each value is a reward for the given approach
-          double[] maxRewards = {0,0,0,0,0,0,0};
-          //General Strategy
-          //Fall back higher reward if player is <2.5
-          //Fall back higher reward if player is normal/special attack
-          //Fall back lower reward if player is blocking
-          //Mid approach higher if distance is 2.5-3.5
-          //Mid approach higher if player is blocking/guard break
-          //Mid approach lower if player is normal/special attack
-          //Far approach higher if distance >3.5
-          //Far apporach higher if player is blocking/guard break
-          //Far approach lower is player is normal/special attack
-          //Neutral approach higher if distance >2.5 AND player attacking
-          //Neutral approach higher if player is blocking/guard break
 
-          if(fightState.distanceX > 3.5f) {
-            maxRewards[4] += 5;
-            maxRewards[5] += 5;
-            if(fightState.isOpponentBlocking || fightState.isOpponentGuardBreak) {
-              maxRewards[4] += 2;
-              maxRewards[5] += ((double)fightState.distanceX)/4.0;
+        public FightState getCurrentState() {
+          var fightState = GetCurrentFightState();
+          return fightState;
+        }
+
+        public movementReward getInitialMovementReward(FightState fightState, List<movementReward> previousRewards) {
+          //we are given a specific distance and player move, and here we will randomly choose an AI move
+          //Idea: if we already know a move which gives >1 reward for this approximate distance and player move
+          //do that AI move, else do a random move and then update the reward for that move given distance and player move
+          //FightState newFightState = new FightState();
+          movementReward moveReward = new movementReward();
+          moveReward.playerMove = fightState;
+          moveReward.reward = 0;
+          for(int i = 0; i < previousRewards.Count; i++) {
+            movementReward previous = previousRewards[i];
+
+            if(previous.reward > moveReward.reward && (previous.playerMove.distanceX > fightState.distanceX - 0.5f 
+            && previous.playerMove.distanceX < fightState.distanceX + 0.5f) 
+            && (previous.playerMove.isOpponentBlocking == fightState.isOpponentBlocking 
+            && previous.playerMove.isOpponentDamage == fightState.isOpponentDamage 
+            && previous.playerMove.isOpponentGuardBreak == fightState.isOpponentGuardBreak 
+            && previous.playerMove.isOpponentNormalAttack == fightState.isOpponentNormalAttack 
+            && previous.playerMove.isOpponentSpecialAttack == fightState.isOpponentSpecialAttack)) {
+              moveReward = previous;
             }
-            else if(fightState.isOpponentSpecialAttack) {
-              maxRewards[0] += 6;
+          }
+          //This below means we didn't find a comparable state in the previous states, so time to be random
+          //Need to update these rewards so that they can be used
+          if(moveReward.type == "") {
+            var rand = Random.Range(0, 7);
+            if(rand == 0) {
+              moveReward.type = "FallBack1";
+            }
+            else if(rand == 1) {
+              moveReward.type = "FallBack2";
+            }
+            else if(rand == 2) {
+              moveReward.type = "MidApproach1";
+            }
+            else if(rand == 3) {
+              moveReward.type = "MidApproach2";
+            }
+            else if(rand == 4) {
+              moveReward.type = "FarApproach1";
+            }
+            else if(rand == 5) {
+              moveReward.type = "FarApproach2";
+            }
+            else if(rand == 6) {
+              moveReward.type = "NeutralMovement";
             }
             else {
-              maxRewards[4] -= 2;
-              maxRewards[5] -= 2;
+              moveReward.type = "NeutralMovement";
             }
           }
-          else if(fightState.distanceX < 3.5f && fightState.distanceX > 2.5f) {
-            maxRewards[2] += 5;
-            maxRewards[3] += 5;
-            maxRewards[6] += 5;
-            if(fightState.isOpponentBlocking || fightState.isOpponentGuardBreak) {
-              maxRewards[2] += 5;
-              maxRewards[3] += ((double) fightState.distanceX)/3.0;
-              maxRewards[6] += 5;
-            }
-            else if(fightState.isOpponentSpecialAttack) {
-              maxRewards[0] += 6;
-            }
-            else {
-              maxRewards[2] -= 2;
-              maxRewards[3] -= 2;
-              maxRewards[6] -= 1;
-            }
-          }
-          else if (fightState.distanceX < 2.5f) {
-            maxRewards[0] += 2.5/ (double)fightState.distanceX;
-            maxRewards[1] += (double) fightState.distanceX;
-            if(fightState.isOpponentNormalAttack || fightState.isOpponentSpecialAttack) {
-              maxRewards[0] += 1;
-              maxRewards[1] += 1;
-              maxRewards[6] -= 1;
-            }
-            else {
-              maxRewards[0] -= 1;
-              maxRewards[1] -= 1;
-              maxRewards[6] -= 0;
-            }
-          }
-          double maxValue = -10000;
-          int aiActionToTake = 0;
-          for(int i = 0; i < maxRewards.Length; i++) {
-            if(maxRewards[i] > maxValue) {
-              maxValue = maxRewards[i];
-              aiActionToTake = i;
-            }
-          }
-
-          if(aiActionToTake == 0) {
-            AddFallBack1();
-          }
-          else if(aiActionToTake == 1) {
-            AddFallBack2();
-          }
-          else if(aiActionToTake == 2) {
-            AddMidApproach1();
-          }
-          else if(aiActionToTake == 3) {
-            AddMidApproach2();
-          }
-          else if(aiActionToTake == 4) {
-            AddFarApproach1();
-          }
-          else if(aiActionToTake == 5) {
-            AddFarApproach2();
-          }
-          else if(aiActionToTake == 6) {
-            AddNeutralMovement();
-          }
-
+          return moveReward;
 
         }
 
-        //Values for each of the AI approaches
-        //0 --> FallBack1
-        //1 --> FallBack2
-        //2 --> MidApproach1
-        //3 --> MidApproach2
-        //4 --> FarApproach1
-        //5 --> FarApproach2
-        //6 --> Neutral
+        public movementReward recalculateMovementReward(FightState fightState, movementReward moveReward) {
+          //This will take the AIs next move and calculate how effective the move truly was
+          double newReward = 0;
+         
+          if(fightState.isOpponentBlocking) {
+            newReward = 1.1;
+          }
+          else if(fightState.isOpponentDamage) {
+            newReward = 1.6;
+          }
+          else if(fightState.isOpponentNormalAttack) {
+            newReward = 0.5;
+          }
+          else if(fightState.isOpponentSpecialAttack) {
+            newReward = 0.5;
+          }
+          else if(fightState.isOpponentGuardBreak) {
+            newReward = 1.4;
+          }
+          else {
+            newReward = 1.0;
+          }
+          moveReward.playerMove = fightState;
+          moveReward.reward = newReward;
+          return moveReward;
 
-        private void SelectMovement(FightState fightState)
+        }
+
+        private void SelectMovement(movementReward movement)
         {
-            computeNextMovement(fightState);
-            /*if (fightState.distanceX > 4f)
-            {
-                var rand = Random.Range(0, 2);
-                if (rand == 0)
-                    AddFarApproach1();
-                else
-                    AddFarApproach2();
+            //computeNextMovement(fightState);
+            if(movement.type == "FallBack1") {
+              AddFallBack1();
             }
-            else if (fightState.distanceX > 3f)
-            {
-                var rand = Random.Range(0, 7);
-                if (rand <= 1)
-                    AddMidApproach1();
-                else if (rand <= 3)
-                    AddMidApproach2();
-                else if (rand == 4)
-                    AddFarApproach1();
-                else if (rand == 5)
-                    AddFarApproach2();
-                else
-                    AddNeutralMovement();
+            else if(movement.type == "FallBack2") {
+              AddFallBack2();
             }
-            else if (fightState.distanceX > 2.5f)
-            {
-                var rand = Random.Range(0, 5);
-                if (rand == 0)
-                    AddMidApproach1();
-                else if (rand == 1)
-                    AddMidApproach2();
-                else if (rand == 2)
-                    AddFallBack1();
-                else if (rand == 3)
-                    AddFallBack2();
-                else
-                    AddNeutralMovement();
+            else if(movement.type == "MidApproach1") {
+              AddMidApproach1();
             }
-            else if (fightState.distanceX > 2f)
-            {
-                var rand = Random.Range(0, 4);
-                if (rand == 0)
-                    AddFallBack1();
-                else if (rand == 1)
-                    AddFallBack2();
-                else
-                    AddNeutralMovement();
+            else if(movement.type == "MidApproach2") {
+              AddMidApproach2();
             }
-            else
-            {
-                var rand = Random.Range(0, 3);
-                if (rand == 0)
-                    AddFallBack1();
-                else if (rand == 1)
-                    AddFallBack2();
-                else
-                    AddNeutralMovement();
-            }*/
+            else if(movement.type == "FarApproach1") {
+              AddFarApproach1();
+            }
+            else if(movement.type == "FarApproach2") {
+              AddFarApproach2();
+            }
+            else if(movement.type == "NeutralMovement") {
+              AddNeutralMovement();
+            }
+            else {
+              AddFallBack1();
+            }
         }
 
-        private void computeNextAttack(FightState fightState) {
-          //we are given a specific distance and player move, and must test each AI attack
-          //to see which one gives the best reward, returns the reward of which move to make
-          //each value is a reward for the given approach
-          //We are also assuming that we know which approach we are going with
-          double[] maxRewards = {0,0,0,0,0};
-          //General Strategy
-          //If player <2.5, one hit or two hit immediate
-          //If player 2.5-3.5, immediateSpecial or none
-          //If player >3.5 delaySpecial or none
-          if (fightState.distanceX < 2.5f) {
-            maxRewards[4] += (double) fightState.distanceX / 1.25;
-            maxRewards[1] += 2.5/ (double)fightState.distanceX;
+        public attackReward getInitialAttackReward(FightState fightState, List<attackReward> previousRewards) {
+          //we are given a specific distance and player move, and here we will randomly choose an AI move
+          //Idea: if we already know a move which gives >1 reward for this approximate distance and player move
+          //do that AI move, else do a random move and then update the reward for that move given distance and player move
+          //FightState newFightState = new FightState();
+          attackReward attReward = new attackReward();
+          attReward.playerMove = fightState;
+          attReward.reward = 0;
+          for(int i = 0; i < previousRewards.Count; i++) {
+            attackReward previous = previousRewards[i];
 
-            if(fightState.isOpponentNormalAttack || fightState.isOpponentSpecialAttack) {
-              maxRewards[4] -= 2;
-              maxRewards[1] -= 2;
-              maxRewards[2] -= 1;
+            if(previous.reward > attReward.reward && (previous.playerMove.distanceX > fightState.distanceX - 0.5f 
+            && previous.playerMove.distanceX < fightState.distanceX + 0.5f) 
+            && (previous.playerMove.isOpponentBlocking == fightState.isOpponentBlocking 
+            && previous.playerMove.isOpponentDamage == fightState.isOpponentDamage 
+            && previous.playerMove.isOpponentGuardBreak == fightState.isOpponentGuardBreak 
+            && previous.playerMove.isOpponentNormalAttack == fightState.isOpponentNormalAttack 
+            && previous.playerMove.isOpponentSpecialAttack == fightState.isOpponentSpecialAttack)) {
+              attReward = previous;
+            }
+          }
+          //This below means we didn't find a comparable state in the previous states, so time to be random
+          //Need to update these rewards so that they can be used
+          if(attReward.type == "") {
+            var rand = Random.Range(0, 4);
+            if(rand == 0) {
+              attReward.type = "OneHitImmediate";
+            }
+            else if(rand == 1) {
+              attReward.type = "TwoHitImmediate";
+            }
+            else if(rand == 2) {
+              attReward.type = "NoAttack";
+            }
+            else if(rand == 3) {
+              attReward.type = "DelaySpecial";
+            }
+            else if(rand == 4) {
+              attReward.type = "ImmediateSpecial";
             }
             else {
-              maxRewards[4] += 1;
-              maxRewards[1] += 1;
-              maxRewards[2] -= 1;
+              attReward.type = "NeutralMovement";
             }
           }
-          else if(fightState.distanceX < 3.5f && fightState.distanceX > 2.5f) {
-            maxRewards[3] += 1;
-            maxRewards[2] += 1;
-            if(fightState.isOpponentBlocking || fightState.isOpponentGuardBreak) {
-              maxRewards[3] -= 2;
-              maxRewards[2] += 1;
-            }
-            else {
-              maxRewards[3] += 2;
-              maxRewards[2] -= 1;
-            }
-          }
-          else if(fightState.distanceX > 3.5f) {
-            maxRewards[0] += 1;
-            maxRewards[2] += 1;
-            if(fightState.isOpponentBlocking || fightState.isOpponentGuardBreak) {
-              maxRewards[2] += 1;
-              maxRewards[3] += ((double)fightState.distanceX)/4.0;
-            }
-            else {
-              maxRewards[0] -= 2;
-              maxRewards[3] -= 1;
-            }
-          }
-          double maxValue = -10000;
-          int aiActionToTake = 0;
-          for(int i = 0; i < maxRewards.Length; i++) {
-            if(maxRewards[i] > maxValue) {
-              maxValue = maxRewards[i];
-              aiActionToTake = i;
-            }
-          }
-
-          if(aiActionToTake == 0) {
-            AddOneHitImmediateAttack();
-          }
-          else if(aiActionToTake == 1) {
-            AddTwoHitImmediateAttack();
-          }
-          else if(aiActionToTake == 2) {
-            AddNoAttack();
-          }
-          else if(aiActionToTake == 3) {
-            AddDelaySpecialAttack();
-          }
-          else if(aiActionToTake == 4) {
-            AddImmediateSpecialAttack();
-          }
+          return attReward;
 
         }
 
-        private void SelectAttack(FightState fightState)
+        public attackReward recalculateAttackReward(FightState fightState, attackReward attReward) {
+          //This will take the AIs next move and calculate how effective the move truly was
+          double newReward = 0;
+         
+          if(fightState.isOpponentBlocking) {
+            newReward = 0.7;
+          }
+          else if(fightState.isOpponentDamage) {
+            newReward = 1.8;
+          }
+          else if(fightState.isOpponentNormalAttack) {
+            newReward = 0.8;
+          }
+          else if(fightState.isOpponentSpecialAttack) {
+            newReward = 0.7;
+          }
+          else if(fightState.isOpponentGuardBreak) {
+            newReward = 1.4;
+          }
+          else {
+            newReward = 1.0;
+          }
+          attReward.playerMove = fightState;
+          attReward.reward = newReward;
+          return attReward;
+
+        }
+
+        private void SelectAttack(attackReward attack)
         {
-            computeNextAttack(fightState);
-            /*if (fightState.isOpponentDamage
-                || fightState.isOpponentGuardBreak
-                || fightState.isOpponentSpecialAttack)
-            {
-                AddTwoHitImmediateAttack();
+            //computeNextMovement(fightState);
+            if(attack.type == "OneHitImmedaite") {
+              AddOneHitImmediateAttack();
             }
-            else if (fightState.distanceX > 4f)
-            {
-                var rand = Random.Range(0, 4);
-                if (rand <= 3)
-                    AddNoAttack();
-                else
-                    AddDelaySpecialAttack();
+            else if(attack.type == "TwoHitImmediate") {
+              AddTwoHitImmediateAttack();
             }
-            else if (fightState.distanceX > 3f)
-            {
-                if (fightState.isOpponentNormalAttack)
-                {
-                    AddTwoHitImmediateAttack();
-                    return;
-                }
-
-                var rand = Random.Range(0, 5);
-                if (rand <= 1)
-                    AddNoAttack();
-                else if (rand <= 3)
-                    AddOneHitImmediateAttack();
-                else
-                    AddDelaySpecialAttack();
+            else if(attack.type == "NoAttack") {
+              AddNoAttack();
             }
-            else if (fightState.distanceX > 2.5f)
-            {
-                var rand = Random.Range(0, 3);
-                if (rand == 0)
-                    AddNoAttack();
-                else if (rand== 1)
-                    AddOneHitImmediateAttack();
-                else
-                    AddTwoHitImmediateAttack();
+            else if(attack.type == "DelaySpecial") {
+              AddDelaySpecialAttack();
             }
-            else if (fightState.distanceX > 2f)
-            {
-                var rand = Random.Range(0, 6);
-                if (rand <= 1)
-                    AddOneHitImmediateAttack();
-                else if (rand <= 3)
-                    AddTwoHitImmediateAttack();
-                else if(rand == 4)
-                    AddImmediateSpecialAttack();
-                else
-                    AddDelaySpecialAttack();
+            else if(attack.type == "ImmedaiteSpecial") {
+              AddImmediateSpecialAttack();
             }
-            else
-            {
-                var rand = Random.Range(0, 3);
-                if (rand == 0)
-                    AddOneHitImmediateAttack();
-                else
-                    AddTwoHitImmediateAttack();
-            }*/
+            else {
+              AddNoAttack();
+            }
         }
 
         private void AddNeutralMovement()
