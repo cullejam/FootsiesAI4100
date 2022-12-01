@@ -94,6 +94,7 @@ namespace Footsies
           //do that AI move, else do a random move and then update the reward for that move given distance and player move
           //FightState newFightState = new FightState();
           movementReward moveReward = new movementReward();
+          bool isChosen = false;
           moveReward.playerMove = fightState;
           moveReward.reward = 0;
           for(int i = 0; i < previousRewards.Count; i++) {
@@ -107,11 +108,12 @@ namespace Footsies
             && previous.playerMove.isOpponentNormalAttack == fightState.isOpponentNormalAttack 
             && previous.playerMove.isOpponentSpecialAttack == fightState.isOpponentSpecialAttack)) {
               moveReward = previous;
+              isChosen = true;
             }
           }
           //This below means we didn't find a comparable state in the previous states, so time to be random
           //Need to update these rewards so that they can be used
-          if(moveReward.type == "") {
+          if(!isChosen) {
             var rand = Random.Range(0, 7);
             if(rand == 0) {
               moveReward.type = "FallBack1";
@@ -142,29 +144,33 @@ namespace Footsies
 
         }
 
-        public movementReward recalculateMovementReward(FightState fightState, movementReward moveReward) {
+        public movementReward recalculateMovementReward(FightState playerFightState, movementReward moveReward, attackReward attReward) {
           //This will take the AIs next move and calculate how effective the move truly was
+          string aiAttack = attReward.type;
+          string aiMove = moveReward.type;
+          FightState aiState = updateAIFightState();
           double newReward = 0;
          
-          if(fightState.isOpponentBlocking) {
-            newReward = 1.1;
+          if(aiState.isOpponentBlocking && playerFightState.isOpponentSpecialAttack && playerFightState.distanceX < 2f) {
+            newReward = 2;
           }
-          else if(fightState.isOpponentDamage) {
-            newReward = 1.6;
+          else if(aiState.isOpponentBlocking && playerFightState.isOpponentNormalAttack && playerFightState.distanceX < 2f) {
+            newReward = 1.8;
           }
-          else if(fightState.isOpponentNormalAttack) {
-            newReward = 0.5;
+          else if(aiState.isOpponentGuardBreak && playerFightState.isOpponentSpecialAttack && playerFightState.distanceX < 2f) {
+            newReward = -1;
           }
-          else if(fightState.isOpponentSpecialAttack) {
-            newReward = 0.5;
+          else if(aiState.isOpponentGuardBreak && playerFightState.isOpponentNormalAttack && playerFightState.distanceX < 2f) {
+            newReward = -1;
           }
-          else if(fightState.isOpponentGuardBreak) {
-            newReward = 1.4;
+          else if(getAIPositionX() > 4.5) {
+            newReward = -0.3;
           }
-          else {
-            newReward = 1.0;
+          else if(getAIPositionX() < 0) {
+            newReward = -1 * (getAIPositionX() / 2);
           }
-          moveReward.playerMove = fightState;
+          
+          moveReward.playerMove = playerFightState;
           moveReward.reward = newReward;
           return moveReward;
 
@@ -205,12 +211,13 @@ namespace Footsies
           //do that AI move, else do a random move and then update the reward for that move given distance and player move
           //FightState newFightState = new FightState();
           attackReward attReward = new attackReward();
+          bool isChosen = false;
           attReward.playerMove = fightState;
           attReward.reward = 0;
           for(int i = 0; i < previousRewards.Count; i++) {
             attackReward previous = previousRewards[i];
 
-            if(previous.reward > attReward.reward && (previous.playerMove.distanceX > fightState.distanceX - 0.5f 
+            if(previous.reward >= attReward.reward && (previous.playerMove.distanceX > fightState.distanceX - 0.5f 
             && previous.playerMove.distanceX < fightState.distanceX + 0.5f) 
             && (previous.playerMove.isOpponentBlocking == fightState.isOpponentBlocking 
             && previous.playerMove.isOpponentDamage == fightState.isOpponentDamage 
@@ -218,11 +225,12 @@ namespace Footsies
             && previous.playerMove.isOpponentNormalAttack == fightState.isOpponentNormalAttack 
             && previous.playerMove.isOpponentSpecialAttack == fightState.isOpponentSpecialAttack)) {
               attReward = previous;
+              isChosen = true;
             }
           }
           //This below means we didn't find a comparable state in the previous states, so time to be random
           //Need to update these rewards so that they can be used
-          if(attReward.type == "") {
+          if(!isChosen) {
             var rand = Random.Range(0, 4);
             if(rand == 0) {
               attReward.type = "OneHitImmediate";
@@ -240,36 +248,53 @@ namespace Footsies
               attReward.type = "ImmediateSpecial";
             }
             else {
-              attReward.type = "NeutralMovement";
+              attReward.type = "NoAttack";
             }
           }
           return attReward;
 
         }
 
-        public attackReward recalculateAttackReward(FightState fightState, attackReward attReward) {
+        public attackReward recalculateAttackReward(FightState playerFightState, attackReward attReward, movementReward moveReward) {
           //This will take the AIs next move and calculate how effective the move truly was
+          //fightState is the player
+          string aiAttack = attReward.type;
+          string aiMove = moveReward.type;
+          FightState aiState = updateAIFightState();
           double newReward = 0;
-         
-          if(fightState.isOpponentBlocking) {
-            newReward = 0.7;
+
+          if(playerFightState.isOpponentDamage) {
+            newReward = 2;
           }
-          else if(fightState.isOpponentDamage) {
+          else if(playerFightState.isOpponentGuardBreak) {
             newReward = 1.8;
           }
-          else if(fightState.isOpponentNormalAttack) {
-            newReward = 0.8;
+          else if((aiAttack == "OneHitImmediate") && (aiMove != "NeutralMovement") && (aiState.distanceX > 2f)) {
+            newReward = 1.1;
           }
-          else if(fightState.isOpponentSpecialAttack) {
-            newReward = 0.7;
+          else if((aiAttack == "OneHitImmediate") && (aiMove == "NeutralMovement") && (aiState.distanceX > 3f)) {
+            newReward = 1.2;
           }
-          else if(fightState.isOpponentGuardBreak) {
-            newReward = 1.4;
+          else if(aiState.isOpponentDamage) {
+            newReward = -2;
+          }
+          else if(aiState.isOpponentGuardBreak) {
+            newReward = -1.8;
+          }
+          else if(aiAttack == "NoAttack") {
+            newReward = -0.1; 
+          }
+          else if((aiAttack == "OneHitImmediate") && (aiMove != "NeutralMovement") && (aiState.distanceX < 2f)) {
+            newReward = 0.3;
+          }
+          else if((aiAttack == "OneHitImmediate") && (aiMove == "NeutralMovement") && (aiState.distanceX < 3f)) {
+            newReward = 0.5;
           }
           else {
-            newReward = 1.0;
+            newReward = 0;
           }
-          attReward.playerMove = fightState;
+
+          attReward.playerMove = playerFightState;
           attReward.reward = newReward;
           return attReward;
 
@@ -450,6 +475,28 @@ namespace Footsies
             moveQueue.Enqueue(GetForwardInput());
         }
 
+        private FightState updateAIFightState()
+        {
+            var currentFightState = new FightState();
+            currentFightState.distanceX = GetDistanceX();
+            currentFightState.isOpponentDamage = battleCore.fighter2.currentActionID == (int)CommonActionID.DAMAGE;
+            currentFightState.isOpponentGuardBreak= battleCore.fighter2.currentActionID == (int)CommonActionID.GUARD_BREAK;
+            currentFightState.isOpponentBlocking = (battleCore.fighter2.currentActionID == (int)CommonActionID.GUARD_CROUCH
+                                                    || battleCore.fighter2.currentActionID == (int)CommonActionID.GUARD_STAND
+                                                    || battleCore.fighter2.currentActionID == (int)CommonActionID.GUARD_M);
+            currentFightState.isOpponentNormalAttack = (battleCore.fighter2.currentActionID == (int)CommonActionID.N_ATTACK
+                                                    || battleCore.fighter2.currentActionID == (int)CommonActionID.B_ATTACK);
+            currentFightState.isOpponentSpecialAttack = (battleCore.fighter2.currentActionID == (int)CommonActionID.N_SPECIAL
+                                                    || battleCore.fighter2.currentActionID == (int)CommonActionID.B_SPECIAL);
+
+            for (int i = 1; i < fightStates.Length; i++)
+            {
+                fightStates[i] = fightStates[i - 1];
+            }
+            fightStates[0] = currentFightState;
+            return currentFightState;
+        }
+
         private void UpdateFightState()
         {
             var currentFightState = new FightState();
@@ -479,6 +526,10 @@ namespace Footsies
         private float GetDistanceX()
         {
             return Mathf.Abs(battleCore.fighter2.position.x - battleCore.fighter1.position.x);
+        }
+
+        private float getAIPositionX() {
+          return battleCore.fighter2.position.x;
         }
 
         private int GetAttackInput()
