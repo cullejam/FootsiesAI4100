@@ -272,10 +272,10 @@ namespace Footsies
 
             currentFightState = battleAI.getCurrentState();
             if(movementObj.reward == 0 ) {
-              movementRewards.Add(battleAI.recalculateMovementReward(currentFightState, movementObj));
+              movementRewards.Add(battleAI.recalculateMovementReward(currentFightState, movementObj, attackObj));
             }
             if(attackObj.reward == 0 ) {
-              attackRewards.Add(battleAI.recalculateAttackReward(currentFightState, attackObj));
+              attackRewards.Add(battleAI.recalculateAttackReward(currentFightState, attackObj, movementObj));
             }
         }
 
@@ -309,20 +309,46 @@ namespace Footsies
 
             currentFightState = battleAI.getCurrentState();
             if(movementObj.reward == 0 ) {
-              movementRewards.Add(battleAI.recalculateMovementReward(currentFightState, movementObj));
+              movementRewards.Add(battleAI.recalculateMovementReward(currentFightState, movementObj, attackObj));
             }
             if(attackObj.reward == 0 ) {
-              attackRewards.Add(battleAI.recalculateAttackReward(currentFightState, attackObj));
+              attackRewards.Add(battleAI.recalculateAttackReward(currentFightState, attackObj, movementObj));
             }
         }
 
         void UpdateKOState()
         {
+            BattleAI.FightState currentFightState = battleAI.getCurrentState();
+            BattleAI.movementReward movementObj = battleAI.getInitialMovementReward(currentFightState, movementRewards);
+            BattleAI.attackReward attackObj = battleAI.getInitialAttackReward(currentFightState, attackRewards);
+            if(movementObj.reward != 0 ) {
+              movementRewards.Add(movementObj);
+            }
+            if(attackObj.reward != 0 ) {
+              attackRewards.Add(attackObj);
+            }
 
+            currentFightState = battleAI.getCurrentState();
+            if(movementObj.reward == 0 ) {
+              movementRewards.Add(battleAI.recalculateMovementReward(currentFightState, movementObj, attackObj));
+            }
+            if(attackObj.reward == 0 ) {
+              attackRewards.Add(battleAI.recalculateAttackReward(currentFightState, attackObj, movementObj));
+            }
         }
 
         void UpdateEndState()
         {
+            BattleAI.FightState currentFightState = battleAI.getCurrentState();
+            BattleAI.movementReward movementObj = battleAI.getInitialMovementReward(currentFightState, movementRewards);
+            BattleAI.attackReward attackObj = battleAI.getInitialAttackReward(currentFightState, attackRewards);
+            if(movementObj.reward != 0 ) {
+              movementRewards.Add(movementObj);
+            }
+            if(attackObj.reward != 0 ) {
+              attackRewards.Add(attackObj);
+            }
+
             _fighters.ForEach((f) => f.IncrementActionFrame());
 
             _fighters.ForEach((f) => f.UpdateActionRequest());
@@ -331,6 +357,14 @@ namespace Footsies
 
             UpdatePushCharacterVsCharacter();
             UpdatePushCharacterVsBackground();
+
+            currentFightState = battleAI.getCurrentState();
+            if(movementObj.reward == 0 ) {
+              movementRewards.Add(battleAI.recalculateMovementReward(currentFightState, movementObj, attackObj));
+            }
+            if(attackObj.reward == 0 ) {
+              attackRewards.Add(battleAI.recalculateAttackReward(currentFightState, attackObj, movementObj));
+            }
         }
 
         InputData GetP1InputData()
