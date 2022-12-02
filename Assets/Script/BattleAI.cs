@@ -163,7 +163,7 @@ namespace Footsies
           else if(aiState.isOpponentGuardBreak && playerFightState.isOpponentNormalAttack && playerFightState.distanceX < 2f) {
             newReward = -1;
           }
-          else if(getAIPositionX() > 4.5) {
+          else if(getAIPositionX() > 4.0) {
             newReward = -0.3;
           }
           else if(getAIPositionX() < 0) {
@@ -489,11 +489,11 @@ namespace Footsies
             currentFightState.isOpponentSpecialAttack = (battleCore.fighter2.currentActionID == (int)CommonActionID.N_SPECIAL
                                                     || battleCore.fighter2.currentActionID == (int)CommonActionID.B_SPECIAL);
 
-            for (int i = 1; i < fightStates.Length; i++)
-            {
-                fightStates[i] = fightStates[i - 1];
-            }
-            fightStates[0] = currentFightState;
+            //for (int i = 1; i < fightStates.Length; i++)
+            //{
+            //    fightStates[i] = fightStates[i - 1];
+           // }
+            //fightStates[0] = currentFightState;
             return currentFightState;
         }
 
