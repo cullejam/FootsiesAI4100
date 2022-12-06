@@ -86,6 +86,8 @@ namespace Footsies
         private List<BattleAI.movementReward> movementRewards = new List<BattleAI.movementReward>();
         private List<BattleAI.attackReward> attackRewards = new List<BattleAI.attackReward>();
 
+        private bool isAgainstComputer = false;
+
         void Awake()
         {
             // Setup dictionary from ScriptableObject data
@@ -194,8 +196,11 @@ namespace Footsies
 
                     roundUIAnimator.SetTrigger("RoundStart");
 
-                    if (GameManager.Instance.isVsCPU)
+                    if (GameManager.Instance.isVsCPU || isAgainstComputer){
                         battleAI = new BattleAI(this);
+                        isAgainstComputer = true;
+                    }
+
 
                     break;
                 case RoundStateType.Fight:
@@ -215,7 +220,7 @@ namespace Footsies
                     fighter1.ClearInput();
                     fighter2.ClearInput();
 
-                    battleAI = null;
+                    //battleAI = null;
 
                     roundUIAnimator.SetTrigger("RoundEnd");
 
@@ -238,6 +243,8 @@ namespace Footsies
                             fighter1.RequestWinAction();
                         }
                     }
+                    Debug.Log("Count:");
+                    Debug.Log(attackRewards.Count);
 
                     break;
             }
@@ -245,7 +252,7 @@ namespace Footsies
 
         void UpdateIntroState()
         {
-            BattleAI.FightState currentFightState = battleAI.getCurrentState();
+            /*BattleAI.FightState currentFightState = battleAI.getCurrentState();
             BattleAI.movementReward movementObj = battleAI.getInitialMovementReward(currentFightState, movementRewards);
             BattleAI.attackReward attackObj = battleAI.getInitialAttackReward(currentFightState, attackRewards);
             if(movementObj.reward != 0 ) {
@@ -253,10 +260,17 @@ namespace Footsies
             }
             if(attackObj.reward != 0 ) {
               attackRewards.Add(attackObj);
-            }
+            }*/
 
+            var p2Input = GetP2InputData();
             var p1Input = GetP1InputData();
-            var p2Input = GetP2InputData(movementObj, attackObj);
+            /*if(GameManager.Instance.isVsCPU) {
+              p2Input = GetP2InputData(movementObj, attackObj);
+            }
+            else {
+              p2Input = GetP2InputData();
+            }*/
+            
             RecordInput(p1Input, p2Input);
             fighter1.UpdateInput(p1Input);
             fighter2.UpdateInput(p2Input);
@@ -270,85 +284,89 @@ namespace Footsies
             UpdatePushCharacterVsCharacter();
             UpdatePushCharacterVsBackground();
 
-            currentFightState = battleAI.getCurrentState();
+            /*currentFightState = battleAI.getCurrentState();
             if(movementObj.reward == 0 ) {
               movementRewards.Add(battleAI.recalculateMovementReward(currentFightState, movementObj, attackObj));
             }
             if(attackObj.reward == 0 ) {
               attackRewards.Add(battleAI.recalculateAttackReward(currentFightState, attackObj, movementObj));
-            }
+            }*/
         }
 
         void UpdateFightState()
         {
-            BattleAI.FightState currentFightState = battleAI.getCurrentState();
-            BattleAI.movementReward movementObj = battleAI.getInitialMovementReward(currentFightState, movementRewards);
-            BattleAI.attackReward attackObj = battleAI.getInitialAttackReward(currentFightState, attackRewards);
-            if(movementObj.reward != 0 ) {
-              movementRewards.Add(movementObj);
+            if(isAgainstComputer) {
+              //Debug.Log("Gets into Loop, Count:");
+              //Debug.Log(attackRewards.Count);
+              //if(attackRewards.Count > 57) {
+              //  Debug.Log(attackRewards[attackRewards.Count-1].reward);
+              //}
+              BattleAI.FightState currentFightState = battleAI.getCurrentState();
+              BattleAI.movementReward movementObj = battleAI.getInitialMovementReward(currentFightState, movementRewards);
+              BattleAI.attackReward attackObj = battleAI.getInitialAttackReward(currentFightState, attackRewards);
+              if(movementObj.reward != 0 ) {
+                movementRewards.Add(movementObj);
+              }
+              if(attackObj.reward != 0 ) {
+                attackRewards.Add(attackObj);
+              }
+              //Debug.Log("Count:");
+              //Debug.Log(attackRewards.Count);
+              
+              var p1Input = GetP1InputData();
+              var p2Input = GetP2InputData(movementObj, attackObj);
+              RecordInput(p1Input, p2Input);
+              fighter1.UpdateInput(p1Input);
+              fighter2.UpdateInput(p2Input);
+
+              _fighters.ForEach((f) => f.IncrementActionFrame());
+
+              _fighters.ForEach((f) => f.UpdateActionRequest());
+              _fighters.ForEach((f) => f.UpdateMovement());
+              _fighters.ForEach((f) => f.UpdateBoxes());
+
+              UpdatePushCharacterVsCharacter();
+              UpdatePushCharacterVsBackground();
+              UpdateHitboxHurtboxCollision();
+
+              currentFightState = battleAI.getCurrentState();
+              if(movementObj.reward == 0 ) {
+                movementRewards.Add(battleAI.recalculateMovementReward(currentFightState, movementObj, attackObj));
+              }
+              if(attackObj.reward == 0 ) {
+                attackRewards.Add(battleAI.recalculateAttackReward(currentFightState, attackObj, movementObj));
+              }
+
+              //Debug.Log("Count After ReCalc:");
+              //Debug.Log(attackRewards.Count);
             }
-            if(attackObj.reward != 0 ) {
-              attackRewards.Add(attackObj);
-            }
+            else {
 
-            var p1Input = GetP1InputData();
-            var p2Input = GetP2InputData(movementObj, attackObj);
-            RecordInput(p1Input, p2Input);
-            fighter1.UpdateInput(p1Input);
-            fighter2.UpdateInput(p2Input);
+              var p2Input = GetP2InputData();
+              var p1Input = GetP1InputData();
+              RecordInput(p1Input, p2Input);
+              fighter1.UpdateInput(p1Input);
+              fighter2.UpdateInput(p2Input);
 
-            _fighters.ForEach((f) => f.IncrementActionFrame());
+              _fighters.ForEach((f) => f.IncrementActionFrame());
 
-            _fighters.ForEach((f) => f.UpdateActionRequest());
-            _fighters.ForEach((f) => f.UpdateMovement());
-            _fighters.ForEach((f) => f.UpdateBoxes());
+              _fighters.ForEach((f) => f.UpdateActionRequest());
+              _fighters.ForEach((f) => f.UpdateMovement());
+              _fighters.ForEach((f) => f.UpdateBoxes());
 
-            UpdatePushCharacterVsCharacter();
-            UpdatePushCharacterVsBackground();
-            UpdateHitboxHurtboxCollision();
-
-            currentFightState = battleAI.getCurrentState();
-            if(movementObj.reward == 0 ) {
-              movementRewards.Add(battleAI.recalculateMovementReward(currentFightState, movementObj, attackObj));
-            }
-            if(attackObj.reward == 0 ) {
-              attackRewards.Add(battleAI.recalculateAttackReward(currentFightState, attackObj, movementObj));
+              UpdatePushCharacterVsCharacter();
+              UpdatePushCharacterVsBackground();
+              UpdateHitboxHurtboxCollision();
             }
         }
 
         void UpdateKOState()
         {
-            BattleAI.FightState currentFightState = battleAI.getCurrentState();
-            BattleAI.movementReward movementObj = battleAI.getInitialMovementReward(currentFightState, movementRewards);
-            BattleAI.attackReward attackObj = battleAI.getInitialAttackReward(currentFightState, attackRewards);
-            if(movementObj.reward != 0 ) {
-              movementRewards.Add(movementObj);
-            }
-            if(attackObj.reward != 0 ) {
-              attackRewards.Add(attackObj);
-            }
-
-            currentFightState = battleAI.getCurrentState();
-            if(movementObj.reward == 0 ) {
-              movementRewards.Add(battleAI.recalculateMovementReward(currentFightState, movementObj, attackObj));
-            }
-            if(attackObj.reward == 0 ) {
-              attackRewards.Add(battleAI.recalculateAttackReward(currentFightState, attackObj, movementObj));
-            }
+  
         }
 
         void UpdateEndState()
         {
-            BattleAI.FightState currentFightState = battleAI.getCurrentState();
-            BattleAI.movementReward movementObj = battleAI.getInitialMovementReward(currentFightState, movementRewards);
-            BattleAI.attackReward attackObj = battleAI.getInitialAttackReward(currentFightState, attackRewards);
-            if(movementObj.reward != 0 ) {
-              movementRewards.Add(movementObj);
-            }
-            if(attackObj.reward != 0 ) {
-              attackRewards.Add(attackObj);
-            }
-
             _fighters.ForEach((f) => f.IncrementActionFrame());
 
             _fighters.ForEach((f) => f.UpdateActionRequest());
@@ -357,14 +375,6 @@ namespace Footsies
 
             UpdatePushCharacterVsCharacter();
             UpdatePushCharacterVsBackground();
-
-            currentFightState = battleAI.getCurrentState();
-            if(movementObj.reward == 0 ) {
-              movementRewards.Add(battleAI.recalculateMovementReward(currentFightState, movementObj, attackObj));
-            }
-            if(attackObj.reward == 0 ) {
-              attackRewards.Add(battleAI.recalculateAttackReward(currentFightState, attackObj, movementObj));
-            }
         }
 
         InputData GetP1InputData()
@@ -404,6 +414,38 @@ namespace Footsies
             if (battleAI != null)
             {
                 p2Input.input |= battleAI.getNextAIInput(movement, attack);
+            }
+            else
+            {
+                p2Input.input |= InputManager.Instance.GetButton(InputManager.Command.p2Left) ? (int)InputDefine.Left : 0;
+                p2Input.input |= InputManager.Instance.GetButton(InputManager.Command.p2Right) ? (int)InputDefine.Right : 0;
+                p2Input.input |= InputManager.Instance.GetButton(InputManager.Command.p2Attack) ? (int)InputDefine.Attack : 0;
+            }
+
+            p2Input.time = time;
+
+            if (debugP2Attack)
+                p2Input.input |= (int)InputDefine.Attack;
+            if (debugP2Guard)
+                p2Input.input |= (int)InputDefine.Right;
+
+            return p2Input;
+        }
+
+        InputData GetP2InputData()
+        {
+            if (isReplayingLastRoundInput)
+            {
+                return lastRoundP2Input[currentReplayingInputIndex];
+            }
+
+            var time = Time.fixedTime - roundStartTime;
+
+            InputData p2Input = new InputData();
+
+            if (battleAI != null)
+            {
+              
             }
             else
             {
