@@ -96,25 +96,29 @@ namespace Footsies
           movementReward moveReward = new movementReward();
           bool isChosen = false;
           moveReward.playerMove = fightState;
-          moveReward.reward = 0;
           for(int i = 0; i < previousRewards.Count; i++) {
-            movementReward previous = previousRewards[i];
-
-            if(previous.reward > moveReward.reward && (previous.playerMove.distanceX > fightState.distanceX - 0.5f 
-            && previous.playerMove.distanceX < fightState.distanceX + 0.5f) 
-            && (previous.playerMove.isOpponentBlocking == fightState.isOpponentBlocking 
-            && previous.playerMove.isOpponentDamage == fightState.isOpponentDamage 
-            && previous.playerMove.isOpponentGuardBreak == fightState.isOpponentGuardBreak 
-            && previous.playerMove.isOpponentNormalAttack == fightState.isOpponentNormalAttack 
-            && previous.playerMove.isOpponentSpecialAttack == fightState.isOpponentSpecialAttack)) {
-              moveReward = previous;
+            //movementReward previous = previousRewards[i];
+            
+            try {
+            if(previousRewards[i].reward > 0 
+            && (previousRewards[i].playerMove.distanceX > fightState.distanceX - 0.5f 
+            && previousRewards[i].playerMove.distanceX < fightState.distanceX + 0.5f) 
+            && (previousRewards[i].playerMove.isOpponentBlocking == fightState.isOpponentBlocking 
+            && previousRewards[i].playerMove.isOpponentDamage == fightState.isOpponentDamage 
+            && previousRewards[i].playerMove.isOpponentGuardBreak == fightState.isOpponentGuardBreak 
+            && previousRewards[i].playerMove.isOpponentNormalAttack == fightState.isOpponentNormalAttack 
+            && previousRewards[i].playerMove.isOpponentSpecialAttack == fightState.isOpponentSpecialAttack)) {
+              moveReward = previousRewards[i];
               isChosen = true;
             }
+            }
+            catch {}
           }
           //This below means we didn't find a comparable state in the previous states, so time to be random
           //Need to update these rewards so that they can be used
           if(!isChosen) {
-            var rand = Random.Range(0, 7);
+            moveReward.reward = 0;
+            int rand = (int)Random.Range(0, 7);
             if(rand == 0) {
               moveReward.type = "FallBack1";
             }
@@ -169,6 +173,9 @@ namespace Footsies
           else if(getAIPositionX() < 0) {
             newReward = -1 * (getAIPositionX() / 2);
           }
+          else {
+            newReward = 0.1;
+          }
           
           moveReward.playerMove = playerFightState;
           moveReward.reward = newReward;
@@ -213,25 +220,30 @@ namespace Footsies
           attackReward attReward = new attackReward();
           bool isChosen = false;
           attReward.playerMove = fightState;
-          attReward.reward = 0;
-          for(int i = 0; i < previousRewards.Count; i++) {
-            attackReward previous = previousRewards[i];
+          for(int i = 0; i < previousRewards.Count ; i++) {
+            //attackReward previous = previousRewards[i];
 
-            if(previous.reward >= attReward.reward && (previous.playerMove.distanceX > fightState.distanceX - 0.5f 
-            && previous.playerMove.distanceX < fightState.distanceX + 0.5f) 
-            && (previous.playerMove.isOpponentBlocking == fightState.isOpponentBlocking 
-            && previous.playerMove.isOpponentDamage == fightState.isOpponentDamage 
-            && previous.playerMove.isOpponentGuardBreak == fightState.isOpponentGuardBreak 
-            && previous.playerMove.isOpponentNormalAttack == fightState.isOpponentNormalAttack 
-            && previous.playerMove.isOpponentSpecialAttack == fightState.isOpponentSpecialAttack)) {
-              attReward = previous;
+            try {
+            if(previousRewards[i].reward > 0 
+            && (previousRewards[i].playerMove.distanceX 
+            > fightState.distanceX - 0.5f 
+            && previousRewards[i].playerMove.distanceX < fightState.distanceX + 0.5f) 
+            && (previousRewards[i].playerMove.isOpponentBlocking == fightState.isOpponentBlocking 
+            && previousRewards[i].playerMove.isOpponentDamage == fightState.isOpponentDamage 
+            && previousRewards[i].playerMove.isOpponentGuardBreak == fightState.isOpponentGuardBreak 
+            && previousRewards[i].playerMove.isOpponentNormalAttack == fightState.isOpponentNormalAttack 
+            && previousRewards[i].playerMove.isOpponentSpecialAttack == fightState.isOpponentSpecialAttack)) {
+              attReward = previousRewards[i];
               isChosen = true;
             }
+            }
+            catch {}
           }
           //This below means we didn't find a comparable state in the previous states, so time to be random
           //Need to update these rewards so that they can be used
           if(!isChosen) {
-            var rand = Random.Range(0, 4);
+            int rand = (int)Random.Range(0, 5);
+            attReward.reward = 0;
             if(rand == 0) {
               attReward.type = "OneHitImmediate";
             }
@@ -291,7 +303,7 @@ namespace Footsies
             newReward = 0.5;
           }
           else {
-            newReward = 0;
+            newReward = 0.1;
           }
 
           attReward.playerMove = playerFightState;
@@ -489,11 +501,11 @@ namespace Footsies
             currentFightState.isOpponentSpecialAttack = (battleCore.fighter2.currentActionID == (int)CommonActionID.N_SPECIAL
                                                     || battleCore.fighter2.currentActionID == (int)CommonActionID.B_SPECIAL);
 
-            //for (int i = 1; i < fightStates.Length; i++)
-            //{
-            //    fightStates[i] = fightStates[i - 1];
-           // }
-            //fightStates[0] = currentFightState;
+            /*for (int i = 1; i < fightStates.Length; i++)
+            {
+                fightStates[i] = fightStates[i - 1];
+            }
+            fightStates[0] = currentFightState;*/
             return currentFightState;
         }
 
